@@ -17,8 +17,12 @@ import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.server.level.ServerLevel;
 
 import javax.annotation.Nullable;
 
@@ -72,5 +76,20 @@ public class TrainBogieBlock extends Block implements EntityBlock {
                         "Bogie on edge #%d at ~%.1f blocks in.", segment.edgeId(), segment.distance())), true);
             }
         }
+    }
+
+    @Override
+    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player,
+                                  InteractionHand hand, BlockHitResult hit) {
+        if (level.isClientSide()) {
+            return InteractionResult.SUCCESS;
+        }
+        if (!player.getItemInHand(hand).isEmpty()) {
+            return InteractionResult.PASS;
+        }
+
+        CarriageAssembler.Result result = CarriageAssembler.assemble((ServerLevel) level, pos);
+        player.displayClientMessage(Component.literal(result.message()), true);
+        return InteractionResult.CONSUME;
     }
 }

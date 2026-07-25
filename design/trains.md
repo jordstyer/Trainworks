@@ -202,8 +202,16 @@ own brake lever. Manual and automated trains use the exact same check.
       `TrackSegmentBlockEntity` directly below it -- that segment's own representative distance,
       not the bogie's exact position; tighten later if needed). Must sit on a track segment,
       auto-breaks otherwise. Confirms via chat message on placement.
-- [ ] Assembly flood-fill scan (single carriage, no gap logic needed yet) → `blockStructure`
-- [ ] Carriage transform math (§3.3) + renderer (§6) for a 2-bogie carriage
+- [x] Assembly flood-fill scan → `blockStructure` (`CarriageAssembler`): right-click an empty-hand
+      on a bogie to flood-fill whatever's built directly above it (stopping at air and at
+      track/anchor/bogie blocks so it can't accidentally eat the track), capturing block state only
+      -- **no block-entity data yet** (a chest's contents are not preserved). Removes the captured
+      blocks and the bogie from the world and spawns a `CarriageEntity`.
+- [x] Renderer (§6) for a single-bogie carriage, via `CarriageRenderer` (a `BlockRenderDispatcher
+      .renderSingleBlock` call per captured block, not full in-world tesselation/AO) -- **not yet**
+      the real bogie-pair transform math (§3.3): the carriage spawns at the bogie's exact position
+      with no rotation, exactly as built. Two-bogie orientation math is a follow-up once this is
+      confirmed rendering correctly.
 - [ ] Control stand: manual throttle/brake, drives a single carriage along straight + curved +
       sloped track built in Phase 1
 - [ ] Disassembly reverses assembly correctly, including a chest's contents

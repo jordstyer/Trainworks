@@ -18,5 +18,6 @@ public class TrainworksMod {
         ModBlocks.BLOCKS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
         ModBlockEntities.BLOCK_ENTITIES.register(modEventBus);
+        ModEntities.ENTITY_TYPES.register(modEventBus);
     }
 }
