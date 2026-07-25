@@ -80,6 +80,31 @@ public class TrackGraph {
         return dot >= 0 ? facingYaw : facingYaw + 180f;
     }
 
+    /**
+     * Removes a node and cascades: every edge touching it is also removed, and
+     * the edge id is cleaned out of whichever other node it was attached to.
+     * Track segment blocks along those edges aren't handled here yet (no such
+     * blocks exist in-world as of this pass) -- see design/track-graph.md §4.
+     */
+    public void removeNode(long nodeId) {
+        Node node = nodes.remove(nodeId);
+        if (node == null) {
+            return;
+        }
+        for (long edgeId : new java.util.ArrayList<>(node.edgeIds())) {
+            Edge edge = edges.remove(edgeId);
+            if (edge == null) {
+                continue;
+            }
+            long otherNodeId = edge.nodeA() == nodeId ? edge.nodeB() : edge.nodeA();
+            Node otherNode = nodes.get(otherNodeId);
+            if (otherNode != null) {
+                otherNode.edgeIds().remove(edgeId);
+            }
+        }
+        markDirty.run();
+    }
+
     /** Rebuilds the Bezier curve for a live edge -- the curve itself is never persisted (design/track-graph.md §5). */
     public BezierCurve curveOf(Edge edge) {
         Node nodeA = nodes.get(edge.nodeA());

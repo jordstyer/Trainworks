@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "trainworks:block/track_anchor" }
+  }
+}

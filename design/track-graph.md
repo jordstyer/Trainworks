@@ -179,10 +179,14 @@ a test track in-world and eyeballing/feeling it:
 
 - [x] Node/Edge data structures + `TrackGraphSavedData` (load/save round-trip test)
 - [x] Bézier construction + LUT generation from two nodes
-- [ ] Anchor item + block (placement sets precise facing, model snaps to 45°)
-- [ ] Linking tool: select → connect → validate → generate edge
+- [x] Anchor item + block (placement sets precise facing from look angle; model does **not** yet
+      snap to 45° -- currently renders as a plain cube with a placeholder iron-block texture)
+- [x] Linking tool: select → connect → generate edge (validation from §6 not yet implemented --
+      only a duplicate-connection check exists so far)
 - [ ] Track segment block + block entity (`edgeId`, `distance`) placed along the LUT
 - [ ] Chunk → edge-id index built at load, used for basic render culling
-- [ ] Validation rules (§6) implemented and tuned against a test track
+- [ ] Validation rules (§6: grade, curve radius, obstruction) implemented and tuned against a
+      test track
 - [ ] Manual test: build a curved + sloped track section, save, reload world, confirm it persists
-      and renders identically
+      and renders identically (blocked on the track segment block above -- nothing renders the
+      curve in-world yet, only the two anchor endpoints)
