@@ -177,8 +177,8 @@ a test track in-world and eyeballing/feeling it:
 
 ## 9. Phase 1 Milestone Checklist
 
-- [ ] Node/Edge data structures + `TrackGraphSavedData` (load/save round-trip test)
-- [ ] Bézier construction + LUT generation from two nodes
+- [x] Node/Edge data structures + `TrackGraphSavedData` (load/save round-trip test)
+- [x] Bézier construction + LUT generation from two nodes
 - [ ] Anchor item + block (placement sets precise facing, model snaps to 45°)
 - [ ] Linking tool: select → connect → validate → generate edge
 - [ ] Track segment block + block entity (`edgeId`, `distance`) placed along the LUT
