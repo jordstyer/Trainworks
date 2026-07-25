@@ -66,6 +66,34 @@ public class TrackGraph {
             throw new IllegalArgumentException("Cannot connect unknown node id");
         }
 
+        CurveResult result = computeCurve(nodeA, nodeB);
+
+        Edge edge = new Edge(nextEdgeId++, nodeAId, nodeBId, result.tangentAYaw(), result.tangentBYaw(), result.curve().length());
+        edges.put(edge.id(), edge);
+        nodeA.edgeIds().add(edge.id());
+        nodeB.edgeIds().add(edge.id());
+        markDirty.run();
+        return edge;
+    }
+
+    /**
+     * Computes what the curve between two nodes *would* look like without
+     * creating anything -- used by the linking tool to validate a connection
+     * (design/track-graph.md §6) before committing to it.
+     */
+    public Optional<BezierCurve> previewCurve(long nodeAId, long nodeBId) {
+        Node nodeA = nodes.get(nodeAId);
+        Node nodeB = nodes.get(nodeBId);
+        if (nodeA == null || nodeB == null) {
+            return Optional.empty();
+        }
+        return Optional.of(computeCurve(nodeA, nodeB).curve());
+    }
+
+    private record CurveResult(float tangentAYaw, float tangentBYaw, BezierCurve curve) {
+    }
+
+    private static CurveResult computeCurve(Node nodeA, Node nodeB) {
         Vec3 posA = Vec3.atCenterOf(nodeA.pos());
         Vec3 posB = Vec3.atCenterOf(nodeB.pos());
 
@@ -73,13 +101,7 @@ public class TrackGraph {
         float tangentBYaw = orientToward(nodeB.facingYaw(), posA, posB);
 
         BezierCurve curve = BezierCurve.create(posA, tangentAYaw, posB, tangentBYaw);
-
-        Edge edge = new Edge(nextEdgeId++, nodeAId, nodeBId, tangentAYaw, tangentBYaw, curve.length());
-        edges.put(edge.id(), edge);
-        nodeA.edgeIds().add(edge.id());
-        nodeB.edgeIds().add(edge.id());
-        markDirty.run();
-        return edge;
+        return new CurveResult(tangentAYaw, tangentBYaw, curve);
     }
 
     /**

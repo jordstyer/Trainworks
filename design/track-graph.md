@@ -194,7 +194,10 @@ a test track in-world and eyeballing/feeling it:
       edge read as one smooth curve (Create-style) rather than a staircase of blocks. **Confirmed
       working in-game**: renders as one seamless ribbon, no winding/visibility issues observed.
 - [ ] Chunk → edge-id index built at load, used for basic render culling
-- [ ] Validation rules (§6: grade, curve radius, obstruction) implemented and tuned against a
-      test track
+- [x] Validation rules (§6: grade, curve radius, obstruction) implemented via
+      `TrackConnectionValidator`, run against a curve preview (`TrackGraph.previewCurve`) before
+      the linking tool commits a connection -- a rejected connection creates nothing. Defaults
+      (25% max grade, 3-block min radius) are unverified against a real test track; tune per §8
+      if they reject reasonable curves or allow unreasonable ones.
 - [ ] Manual test: build a curved + sloped track section, save, reload world, confirm it persists
       and renders identically

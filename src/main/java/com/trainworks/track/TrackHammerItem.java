@@ -19,10 +19,11 @@ import java.util.UUID;
 
 /**
  * The linking tool. Right-click one anchor to select it, right-click a
- * second anchor to connect them -- see design/track-graph.md §7. No grade/
- * radius/obstruction validation yet (§6) -- that's a follow-up pass; this
- * only rejects connecting an anchor to itself or to one it's already
- * directly connected to.
+ * second anchor to connect them -- see design/track-graph.md §7. Rejects
+ * connecting an anchor to itself or to one it's already directly connected
+ * to, and runs {@link TrackConnectionValidator} (grade/curve-radius/
+ * obstruction, §6) against a preview of the curve before committing --
+ * a rejected connection never creates a node/edge or places any blocks.
  *
  * <p>Sneak-right-click an anchor that has no edges yet to re-face it toward
  * your current look direction instead of selecting it -- lets you fix a
@@ -86,6 +87,17 @@ public class TrackHammerItem extends Item {
 
         if (alreadyConnected(graph, previous.nodeId(), anchor.nodeId())) {
             player.displayClientMessage(Component.literal("Those anchors are already connected."), true);
+            return InteractionResult.CONSUME;
+        }
+
+        Optional<BezierCurve> preview = graph.previewCurve(previous.nodeId(), anchor.nodeId());
+        if (preview.isEmpty()) {
+            return InteractionResult.CONSUME;
+        }
+        TrackConnectionValidator.Result validation =
+                TrackConnectionValidator.validate(serverLevel, preview.get(), previous.pos(), pos);
+        if (!validation.valid()) {
+            player.displayClientMessage(Component.literal("Can't connect: " + validation.reason()), true);
             return InteractionResult.CONSUME;
         }
 
