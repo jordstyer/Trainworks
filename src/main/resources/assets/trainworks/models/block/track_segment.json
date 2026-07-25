@@ -1,20 +1,21 @@
 {
   "parent": "minecraft:block/block",
   "textures": {
-    "particle": "minecraft:block/polished_andesite",
-    "texture": "minecraft:block/polished_andesite"
+    "particle": "trainworks:block/track_segment_side",
+    "top": "trainworks:block/track_segment_top",
+    "side": "trainworks:block/track_segment_side"
   },
   "elements": [
     {
       "from": [0, 6, 0],
       "to": [16, 10, 16],
       "faces": {
-        "down": { "texture": "#texture" },
-        "up": { "texture": "#texture" },
-        "north": { "texture": "#texture" },
-        "south": { "texture": "#texture" },
-        "west": { "texture": "#texture" },
-        "east": { "texture": "#texture" }
+        "down": { "texture": "#top" },
+        "up": { "texture": "#top" },
+        "north": { "texture": "#side" },
+        "south": { "texture": "#side" },
+        "west": { "texture": "#side" },
+        "east": { "texture": "#side" }
       }
     }
   ]

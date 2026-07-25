@@ -1,9 +1,10 @@
 {
   "parent": "minecraft:block/block",
   "textures": {
-    "particle": "minecraft:block/iron_block",
-    "base": "minecraft:block/iron_block",
-    "indicator": "minecraft:block/redstone_lamp_on"
+    "particle": "trainworks:block/track_anchor_base",
+    "base": "trainworks:block/track_anchor_base",
+    "indicator_face": "trainworks:block/track_anchor_indicator_face",
+    "indicator_edge": "trainworks:block/track_anchor_indicator_edge"
   },
   "elements": [
     {
@@ -22,12 +23,12 @@
       "from": [4, 0, 15],
       "to": [12, 16, 16],
       "faces": {
-        "down": { "texture": "#indicator" },
-        "up": { "texture": "#indicator" },
-        "north": { "texture": "#indicator" },
-        "south": { "texture": "#indicator" },
-        "west": { "texture": "#indicator" },
-        "east": { "texture": "#indicator" }
+        "down": { "texture": "#indicator_edge" },
+        "up": { "texture": "#indicator_edge" },
+        "north": { "texture": "#indicator_edge" },
+        "south": { "texture": "#indicator_face" },
+        "west": { "texture": "#indicator_edge" },
+        "east": { "texture": "#indicator_edge" }
       }
     }
   ]
