@@ -179,10 +179,11 @@ a test track in-world and eyeballing/feeling it:
 
 - [x] Node/Edge data structures + `TrackGraphSavedData` (load/save round-trip test)
 - [x] Bézier construction + LUT generation from two nodes
-- [x] Anchor item + block (placement sets precise facing from look angle; model does **not** yet
-      snap to 45° -- currently renders as a plain cube with a placeholder iron-block texture)
+- [x] Anchor item + block (placement sets precise facing from look angle; model snaps to the
+      nearest 45° with a rotated indicator stripe, placeholder iron-block texture)
 - [x] Linking tool: select → connect → generate edge (validation from §6 not yet implemented --
-      only a duplicate-connection check exists so far)
+      only a duplicate-connection check exists so far); sneak-right-click an unconnected anchor
+      to re-face it toward your current look direction
 - [x] Track segment block + block entity (`edgeId`, `distance`) placed along the LUT (placeholder
       single-block-wide thin slab shape/texture, not the 3-wide gauge model yet)
 - [ ] Chunk → edge-id index built at load, used for basic render culling

@@ -69,6 +69,21 @@ public class TrackGraph {
         return edge;
     }
 
+    /**
+     * Re-orients an anchor before it's been connected to anything. Returns
+     * false (no-op) if the node doesn't exist or already has an edge --
+     * see {@link Node#setFacingYaw}.
+     */
+    public boolean refaceNode(long nodeId, float facingYaw) {
+        Node node = nodes.get(nodeId);
+        if (node == null || !node.edgeIds().isEmpty()) {
+            return false;
+        }
+        node.setFacingYaw(facingYaw);
+        markDirty.run();
+        return true;
+    }
+
     /** Picks {@code facingYaw} or {@code facingYaw + 180} -- whichever points toward {@code to}. */
     private static float orientToward(float facingYaw, Vec3 from, Vec3 to) {
         double rad = Math.toRadians(facingYaw);

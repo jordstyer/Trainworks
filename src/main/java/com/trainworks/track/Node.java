@@ -16,7 +16,7 @@ import java.util.List;
 public class Node {
     private final long id;
     private final BlockPos pos;
-    private final float facingYaw;
+    private float facingYaw;
     private final List<Long> edgeIds = new ArrayList<>();
 
     public Node(long id, BlockPos pos, float facingYaw) {
@@ -35,6 +35,19 @@ public class Node {
 
     public float facingYaw() {
         return facingYaw;
+    }
+
+    /**
+     * Re-orients an unconnected anchor. Once an edge exists its tangent is
+     * locked in permanently (design/track-graph.md §2.2/§7), so this refuses
+     * to touch a node that has any edges -- reconnecting would silently warp
+     * an existing curve out from under whatever's already built along it.
+     */
+    public void setFacingYaw(float facingYaw) {
+        if (!edgeIds.isEmpty()) {
+            throw new IllegalStateException("Cannot re-face a node that already has edges");
+        }
+        this.facingYaw = facingYaw;
     }
 
     public List<Long> edgeIds() {

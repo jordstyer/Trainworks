@@ -10,6 +10,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -17,11 +18,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * The linking tool: right-click one anchor to select it, right-click a second
- * anchor to connect them. See design/track-graph.md §7. No grade/radius/
- * obstruction validation yet (§6 of that doc) -- that's a follow-up pass;
- * this only rejects connecting an anchor to itself or to one it's already
+ * The linking tool. Right-click one anchor to select it, right-click a
+ * second anchor to connect them -- see design/track-graph.md §7. No grade/
+ * radius/obstruction validation yet (§6) -- that's a follow-up pass; this
+ * only rejects connecting an anchor to itself or to one it's already
  * directly connected to.
+ *
+ * <p>Sneak-right-click an anchor that has no edges yet to re-face it toward
+ * your current look direction instead of selecting it -- lets you fix a
+ * badly-facing anchor (see the facing indicator on the block) before you
+ * commit to a connection.</p>
  */
 public class TrackHammerItem extends Item {
 
@@ -54,6 +60,13 @@ public class TrackHammerItem extends Item {
             return InteractionResult.SUCCESS;
         }
 
+        ServerLevel serverLevel = (ServerLevel) level;
+        TrackGraph graph = TrackGraphSavedData.get(serverLevel).graph();
+
+        if (context.isSecondaryUseActive()) {
+            return reface(serverLevel, graph, pos, anchor, player);
+        }
+
         UUID playerId = player.getUUID();
         Selection previous = SELECTIONS.get(playerId);
 
@@ -69,7 +82,6 @@ public class TrackHammerItem extends Item {
             return InteractionResult.CONSUME;
         }
 
-        TrackGraph graph = TrackGraphSavedData.get((ServerLevel) level).graph();
         SELECTIONS.remove(playerId);
 
         if (alreadyConnected(graph, previous.nodeId(), anchor.nodeId())) {
@@ -78,8 +90,21 @@ public class TrackHammerItem extends Item {
         }
 
         Edge edge = graph.connect(previous.nodeId(), anchor.nodeId());
-        TrackSegmentPlacer.place((ServerLevel) level, graph, edge);
+        TrackSegmentPlacer.place(serverLevel, graph, edge);
         player.displayClientMessage(Component.literal(String.format("Connected -- edge length %.1f blocks.", edge.length())), true);
+        return InteractionResult.CONSUME;
+    }
+
+    private static InteractionResult reface(ServerLevel level, TrackGraph graph, BlockPos pos,
+                                             TrackAnchorBlockEntity anchor, Player player) {
+        float yaw = player.getYRot();
+        if (!graph.refaceNode(anchor.nodeId(), yaw)) {
+            player.displayClientMessage(Component.literal("Can't re-face an anchor that's already connected."), true);
+            return InteractionResult.CONSUME;
+        }
+        BlockState state = level.getBlockState(pos);
+        level.setBlockAndUpdate(pos, state.setValue(TrackAnchorBlock.FACING_INDEX, TrackAnchorBlock.yawToIndex(yaw)));
+        player.displayClientMessage(Component.literal("Anchor re-faced."), true);
         return InteractionResult.CONSUME;
     }
 

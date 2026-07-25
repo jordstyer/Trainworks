@@ -6,6 +6,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.server.level.ServerLevel;
@@ -13,16 +15,32 @@ import net.minecraft.server.level.ServerLevel;
 import javax.annotation.Nullable;
 
 /**
- * A single track anchor -- one "port" in the track graph. The rendered model
- * doesn't yet snap to placement direction (design/track-graph.md §7 notes this
- * as a later cosmetic pass); the precise facing used for curve math is read
- * from the placer's look angle and stored on the {@link Node}, independent of
- * the block's appearance.
+ * A single track anchor -- one "port" in the track graph. {@code FACING_INDEX}
+ * is a cosmetic 8-way (45°) snap of the node's precise facing, purely so the
+ * player can see which way a connection will tend to leave the anchor before
+ * committing to it (design/track-graph.md §7) -- the actual curve math always
+ * uses the node's stored float yaw, never this snapped value.
  */
 public class TrackAnchorBlock extends Block implements EntityBlock {
+    public static final IntegerProperty FACING_INDEX = IntegerProperty.create("facing", 0, 7);
 
     public TrackAnchorBlock(Properties properties) {
         super(properties);
+        registerDefaultState(this.stateDefinition.any().setValue(FACING_INDEX, 0));
+    }
+
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(FACING_INDEX);
+    }
+
+    /** Nearest 45° increment of {@code yaw}, as an index 0-7 (0 = south, matching the yaw=0 convention used throughout the track package). */
+    public static int yawToIndex(float yaw) {
+        float normalized = yaw % 360f;
+        if (normalized < 0) {
+            normalized += 360f;
+        }
+        return Math.round(normalized / 45f) % 8;
     }
 
     @Override
@@ -36,11 +54,13 @@ public class TrackAnchorBlock extends Block implements EntityBlock {
         if (level.isClientSide() || placer == null) {
             return;
         }
+        float yaw = placer.getYRot();
         TrackGraph graph = TrackGraphSavedData.get((ServerLevel) level).graph();
-        Node node = graph.addNode(pos.immutable(), placer.getYRot());
+        Node node = graph.addNode(pos.immutable(), yaw);
         if (level.getBlockEntity(pos) instanceof TrackAnchorBlockEntity anchor) {
             anchor.setNodeId(node.id());
         }
+        level.setBlockAndUpdate(pos, level.getBlockState(pos).setValue(FACING_INDEX, yawToIndex(yaw)));
     }
 
     @Override
