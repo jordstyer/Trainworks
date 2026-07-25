@@ -1,7 +1,6 @@
 package com.trainworks.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import com.trainworks.train.CarriageEntity;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
@@ -20,19 +19,22 @@ import net.minecraft.resources.ResourceLocation;
  * ambient occlusion/tesselation (design/trains.md §6), but simple and
  * reliable for a first pass.
  *
- * <p>The whole carriage is rotated once, by the entity's own yaw (set at
- * assembly time from the track's direction at the bogie -- design/
- * trains.md §3.3), before any per-block translation -- this rotates each
- * block's own facing along with its position, not just its position.
+ * <p><strong>No rotation is applied here</strong> -- a conceptual correction
+ * after testing showed structures rotating away from correct alignment, not
+ * toward it. The captured relative offsets were extracted directly from the
+ * world, where the player necessarily built <em>already aligned with the
+ * physical track</em> (that's what "coincident with the track" means) --
+ * so they're already in the correct final orientation. Rotating them again
+ * by the track's absolute yaw double-counts that alignment. Rotation would
+ * only become meaningful once a carriage can move to a point on the curve
+ * with a different heading than where it was assembled -- and even then,
+ * what's needed is the *delta* between assembly-time yaw and current yaw,
+ * not the raw absolute angle applied here before. No movement exists yet,
+ * so for this static-only phase the correct answer is no rotation at all.
  *
- * <p>The angle is negated ({@code -entityYaw}). Verified against vanilla's
- * own {@code Direction.fromYRot}: Minecraft's yaw increases <em>clockwise</em>
- * viewed from above (0=south, 90=west, ...), matching the convention this
- * mod already uses everywhere else, but {@code Axis.YP.rotationDegrees}
- * applies a standard right-handed rotation, which is <em>counter-clockwise</em>
- * for a positive angle viewed from above -- opposite handedness. Confirmed
- * by an in-game test (structures built in line with the track rendered
- * perpendicular before this negation) rather than assumed.</p>
+ * <p>The entity's own yaw (set at assembly time from the track's direction
+ * at the bogie -- design/trains.md §3.3) is still stored on the entity for
+ * that future delta-based use; it's just not consulted for rendering yet.</p>
  */
 public class CarriageRenderer extends EntityRenderer<CarriageEntity> {
     private final BlockRenderDispatcher blockRenderDispatcher;
@@ -45,9 +47,6 @@ public class CarriageRenderer extends EntityRenderer<CarriageEntity> {
     @Override
     public void render(CarriageEntity entity, float entityYaw, float partialTick, PoseStack poseStack,
                         MultiBufferSource bufferSource, int packedLight) {
-        poseStack.pushPose();
-        poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw));
-
         for (CarriageEntity.CapturedBlock block : entity.capturedBlocks()) {
             BlockPos relative = block.relativeOffset();
             poseStack.pushPose();
@@ -55,8 +54,6 @@ public class CarriageRenderer extends EntityRenderer<CarriageEntity> {
             blockRenderDispatcher.renderSingleBlock(block.state(), poseStack, bufferSource, packedLight, OverlayTexture.NO_OVERLAY);
             poseStack.popPose();
         }
-
-        poseStack.popPose();
         super.render(entity, entityYaw, partialTick, poseStack, bufferSource, packedLight);
     }
 

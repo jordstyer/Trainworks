@@ -217,12 +217,17 @@ own brake lever. Manual and automated trains use the exact same check.
 - [x] Single-bogie position/orientation from the track (§3.3, partial -- single point, not yet the
       two-bogie pair math): `CarriageAssembler` reads the bogie's edge/distance *before* removing
       it, computes `curve.positionAt`/`yawAt` at that distance, and spawns the carriage there with
-      that yaw instead of at the bogie's raw block position with zero rotation.
-      `CarriageRenderer` applies that yaw as a single whole-carriage rotation (via `Axis.YP
-      .rotationDegrees`, applied before any per-block translation, so each block's own facing
-      rotates too, not just its position) using the same sign convention already validated via the
-      anchor's facing indicator. No pitch/slope tilt yet -- deferred, noted as a known gap.
-      **Not yet manually tested in-game** -- next thing to verify.
+      that yaw instead of at the bogie's raw block position. **Renderer applies no rotation** --
+      tried whole-carriage rotation via `Axis.YP.rotationDegrees` first, but in-game testing
+      showed it rotating structures *away* from correct alignment. Root realization: captured
+      offsets come straight from the world, where the player necessarily built already aligned
+      with the physical track ("coincident with the track") -- they're already correctly
+      oriented, so rotating by the track's absolute yaw double-counts that alignment. Rotation
+      only becomes meaningful once a carriage can move to a point with a *different* heading than
+      where it was assembled, and even then what's needed is the *delta* between assembly-time
+      and current yaw, not the raw angle. The entity still stores yaw (for that future use); the
+      renderer just doesn't consult it yet. No pitch/slope tilt either -- deferred, known gap.
+      **Not yet retested in-game** after this correction.
 - [ ] Control stand: manual throttle/brake, drives a single carriage along straight + curved +
       sloped track built in Phase 1
 - [ ] Disassembly reverses assembly correctly, including a chest's contents
