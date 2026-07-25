@@ -2,6 +2,7 @@ package com.trainworks;
 
 import com.trainworks.track.TrackAnchorBlock;
 import com.trainworks.track.TrackSegmentBlock;
+import com.trainworks.train.TrainBogieBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -24,6 +25,12 @@ public class ModBlocks {
     public static final RegistryObject<Block> TRACK_SEGMENT = BLOCKS.register("track_segment",
             () -> new TrackSegmentBlock(BlockBehaviour.Properties.of()
                     .strength(2.0f, 6.0f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()));
+
+    public static final RegistryObject<Block> TRAIN_BOGIE = BLOCKS.register("train_bogie",
+            () -> new TrainBogieBlock(BlockBehaviour.Properties.of()
+                    .strength(2.5f, 6.0f)
                     .sound(SoundType.METAL)
                     .noOcclusion()));
 }

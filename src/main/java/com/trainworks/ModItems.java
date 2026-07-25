@@ -19,4 +19,7 @@ public class ModItems {
 
     public static final RegistryObject<Item> TRACK_HAMMER = ITEMS.register("track_hammer",
             () -> new TrackHammerItem(new Item.Properties().stacksTo(1)));
+
+    public static final RegistryObject<Item> TRAIN_BOGIE = ITEMS.register("train_bogie",
+            () -> new BlockItem(ModBlocks.TRAIN_BOGIE.get(), new Item.Properties()));
 }

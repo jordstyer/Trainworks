@@ -20,6 +20,7 @@ public final class TrainworksModBusEvents {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(ModItems.TRACK_ANCHOR.get());
             event.accept(ModItems.TRACK_HAMMER.get());
+            event.accept(ModItems.TRAIN_BOGIE.get());
         }
     }
 }

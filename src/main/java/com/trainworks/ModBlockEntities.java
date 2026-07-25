@@ -2,6 +2,7 @@ package com.trainworks;
 
 import com.trainworks.track.TrackAnchorBlockEntity;
 import com.trainworks.track.TrackSegmentBlockEntity;
+import com.trainworks.train.TrainBogieBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -18,4 +19,8 @@ public class ModBlockEntities {
     public static final RegistryObject<BlockEntityType<TrackSegmentBlockEntity>> TRACK_SEGMENT =
             BLOCK_ENTITIES.register("track_segment", () -> BlockEntityType.Builder.of(
                     TrackSegmentBlockEntity::new, ModBlocks.TRACK_SEGMENT.get()).build(null));
+
+    public static final RegistryObject<BlockEntityType<TrainBogieBlockEntity>> TRAIN_BOGIE =
+            BLOCK_ENTITIES.register("train_bogie", () -> BlockEntityType.Builder.of(
+                    TrainBogieBlockEntity::new, ModBlocks.TRAIN_BOGIE.get()).build(null));
 }

@@ -198,7 +198,10 @@ own brake lever. Manual and automated trains use the exact same check.
 ## 9. Phase 2/3 Milestone Checklist
 
 **Phase 2 (single carriage):**
-- [ ] Bogie block records `edgeId`/`distance` on placement
+- [x] Bogie block records `edgeId`/`distance` on placement (approximated from the
+      `TrackSegmentBlockEntity` directly below it -- that segment's own representative distance,
+      not the bogie's exact position; tighten later if needed). Must sit on a track segment,
+      auto-breaks otherwise. Confirms via chat message on placement.
 - [ ] Assembly flood-fill scan (single carriage, no gap logic needed yet) → `blockStructure`
 - [ ] Carriage transform math (§3.3) + renderer (§6) for a 2-bogie carriage
 - [ ] Control stand: manual throttle/brake, drives a single carriage along straight + curved +
