@@ -22,8 +22,15 @@ import net.minecraft.world.phys.Vec3;
 public final class BezierCurve {
     /** Fraction of the *middle segment's* horizontal distance used for control-point offset. */
     public static final double CONTROL_LENGTH_FACTOR = 1.0 / 3.0;
-    /** Target length of the straight lead-in/lead-out at each anchor, in blocks. */
-    public static final double STRAIGHT_LEAD_LENGTH = 1.0;
+    /**
+     * Target length of the straight lead-in/lead-out at each anchor, in blocks.
+     * Deliberately generous: the anchor's own block is skipped from placement
+     * (design/track-graph.md §4), which eats roughly the first half-block of
+     * whatever lead length is requested here -- a short lead (e.g. 1 block)
+     * ends up rendering less than a block of visible straight track, easy to
+     * miss entirely. This is sized to guarantee an unmistakable straight run.
+     */
+    public static final double STRAIGHT_LEAD_LENGTH = 3.0;
     private static final int LUT_SAMPLES = 48;
 
     private final Vec3 posA;
