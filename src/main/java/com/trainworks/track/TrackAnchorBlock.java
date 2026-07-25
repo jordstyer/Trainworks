@@ -16,13 +16,20 @@ import javax.annotation.Nullable;
 
 /**
  * A single track anchor -- one "port" in the track graph. {@code FACING_INDEX}
- * is a cosmetic 8-way (45°) snap of the node's precise facing, purely so the
+ * is a cosmetic 4-way (90°) snap of the node's precise facing, purely so the
  * player can see which way a connection will tend to leave the anchor before
  * committing to it (design/track-graph.md §7) -- the actual curve math always
  * uses the node's stored float yaw, never this snapped value.
+ *
+ * <p>4-way rather than the originally-planned 8-way: vanilla's blockstate
+ * "variants" rotation only supports 0/90/180/270 (a fixed 16-entry lookup
+ * table in {@code BlockModelRotation} -- anything else fails to resolve and
+ * the block falls back to the missing-model checkerboard). A precise/8-way
+ * indicator would need a custom BlockEntityRenderer instead; not worth the
+ * extra complexity yet.</p>
  */
 public class TrackAnchorBlock extends Block implements EntityBlock {
-    public static final IntegerProperty FACING_INDEX = IntegerProperty.create("facing", 0, 7);
+    public static final IntegerProperty FACING_INDEX = IntegerProperty.create("facing", 0, 3);
 
     public TrackAnchorBlock(Properties properties) {
         super(properties);
@@ -34,13 +41,13 @@ public class TrackAnchorBlock extends Block implements EntityBlock {
         builder.add(FACING_INDEX);
     }
 
-    /** Nearest 45° increment of {@code yaw}, as an index 0-7 (0 = south, matching the yaw=0 convention used throughout the track package). */
+    /** Nearest 90° increment of {@code yaw}, as an index 0-3 (0 = south, matching the yaw=0 convention used throughout the track package). */
     public static int yawToIndex(float yaw) {
         float normalized = yaw % 360f;
         if (normalized < 0) {
             normalized += 360f;
         }
-        return Math.round(normalized / 45f) % 8;
+        return Math.round(normalized / 90f) % 4;
     }
 
     @Override

@@ -1,12 +1,8 @@
 {
   "variants": {
     "facing=0": { "model": "trainworks:block/track_anchor", "y": 0 },
-    "facing=1": { "model": "trainworks:block/track_anchor", "y": 45 },
-    "facing=2": { "model": "trainworks:block/track_anchor", "y": 90 },
-    "facing=3": { "model": "trainworks:block/track_anchor", "y": 135 },
-    "facing=4": { "model": "trainworks:block/track_anchor", "y": 180 },
-    "facing=5": { "model": "trainworks:block/track_anchor", "y": 225 },
-    "facing=6": { "model": "trainworks:block/track_anchor", "y": 270 },
-    "facing=7": { "model": "trainworks:block/track_anchor", "y": 315 }
+    "facing=1": { "model": "trainworks:block/track_anchor", "y": 90 },
+    "facing=2": { "model": "trainworks:block/track_anchor", "y": 180 },
+    "facing=3": { "model": "trainworks:block/track_anchor", "y": 270 }
   }
 }
