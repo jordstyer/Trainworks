@@ -10,6 +10,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraftforge.entity.IEntityAdditionalSpawnData;
 
 import java.util.ArrayList;
@@ -40,17 +41,48 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
     }
 
     private List<CapturedBlock> capturedBlocks = List.of();
+    // Bounds of the captured blocks, relative to this entity's position -- used to build a
+    // culling box that actually covers the rendered content (see getBoundingBoxForCulling).
+    // The declared EntityType size (1x1x1) does not; leaving the default culling box would let
+    // the renderer get skipped for any carriage taller/wider than that, with no error or crash,
+    // just nothing drawn -- exactly what happened before this was added.
+    private BlockPos boundsMin = BlockPos.ZERO;
+    private BlockPos boundsMax = BlockPos.ZERO;
 
     public CarriageEntity(EntityType<?> type, Level level) {
         super(type, level);
     }
 
     public void setCapturedBlocks(List<CapturedBlock> blocks) {
-        this.capturedBlocks = List.copyOf(blocks);
+        applyCapturedBlocks(blocks);
     }
 
     public List<CapturedBlock> capturedBlocks() {
         return capturedBlocks;
+    }
+
+    private void applyCapturedBlocks(List<CapturedBlock> blocks) {
+        this.capturedBlocks = List.copyOf(blocks);
+
+        int minX = 0, minY = 0, minZ = 0, maxX = 0, maxY = 0, maxZ = 0;
+        for (CapturedBlock block : this.capturedBlocks) {
+            BlockPos pos = block.relativeOffset();
+            minX = Math.min(minX, pos.getX());
+            minY = Math.min(minY, pos.getY());
+            minZ = Math.min(minZ, pos.getZ());
+            maxX = Math.max(maxX, pos.getX());
+            maxY = Math.max(maxY, pos.getY());
+            maxZ = Math.max(maxZ, pos.getZ());
+        }
+        this.boundsMin = new BlockPos(minX, minY, minZ);
+        this.boundsMax = new BlockPos(maxX, maxY, maxZ);
+    }
+
+    @Override
+    public AABB getBoundingBoxForCulling() {
+        return new AABB(
+                getX() + boundsMin.getX(), getY() + boundsMin.getY(), getZ() + boundsMin.getZ(),
+                getX() + boundsMax.getX() + 1, getY() + boundsMax.getY() + 1, getZ() + boundsMax.getZ() + 1);
     }
 
     @Override
@@ -69,7 +101,7 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
             BlockState state = Block.BLOCK_STATE_REGISTRY.byId(entry.getInt("State"));
             blocks.add(new CapturedBlock(relative, state));
         }
-        this.capturedBlocks = blocks;
+        applyCapturedBlocks(blocks);
     }
 
     @Override
@@ -102,6 +134,6 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
             BlockState state = Block.BLOCK_STATE_REGISTRY.byId(buffer.readVarInt());
             blocks.add(new CapturedBlock(relative, state));
         }
-        this.capturedBlocks = blocks;
+        applyCapturedBlocks(blocks);
     }
 }
