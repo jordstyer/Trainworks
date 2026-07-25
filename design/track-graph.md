@@ -191,9 +191,8 @@ a test track in-world and eyeballing/feeling it:
 - [x] Continuous curved rendering: `TrackSegmentRenderer` (com.trainworks.client) draws each
       segment's stored local polyline as a flat textured ribbon via a custom
       `BlockEntityRenderer`, instead of a static per-block cube model -- this is what makes a whole
-      edge read as one smooth curve (Create-style) rather than a staircase of blocks. First-draft,
-      unverified in a running client -- see the risk note in that class's javadoc regarding quad
-      winding (geometry is deliberately double-emitted to guarantee visibility either way)
+      edge read as one smooth curve (Create-style) rather than a staircase of blocks. **Confirmed
+      working in-game**: renders as one seamless ribbon, no winding/visibility issues observed.
 - [ ] Chunk → edge-id index built at load, used for basic render culling
 - [ ] Validation rules (§6: grade, curve radius, obstruction) implemented and tuned against a
       test track
