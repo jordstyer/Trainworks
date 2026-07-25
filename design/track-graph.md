@@ -183,10 +183,10 @@ a test track in-world and eyeballing/feeling it:
       snap to 45° -- currently renders as a plain cube with a placeholder iron-block texture)
 - [x] Linking tool: select → connect → generate edge (validation from §6 not yet implemented --
       only a duplicate-connection check exists so far)
-- [ ] Track segment block + block entity (`edgeId`, `distance`) placed along the LUT
+- [x] Track segment block + block entity (`edgeId`, `distance`) placed along the LUT (placeholder
+      single-block-wide thin slab shape/texture, not the 3-wide gauge model yet)
 - [ ] Chunk → edge-id index built at load, used for basic render culling
 - [ ] Validation rules (§6: grade, curve radius, obstruction) implemented and tuned against a
       test track
 - [ ] Manual test: build a curved + sloped track section, save, reload world, confirm it persists
-      and renders identically (blocked on the track segment block above -- nothing renders the
-      curve in-world yet, only the two anchor endpoints)
+      and renders identically

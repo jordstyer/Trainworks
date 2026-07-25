@@ -78,6 +78,7 @@ public class TrackHammerItem extends Item {
         }
 
         Edge edge = graph.connect(previous.nodeId(), anchor.nodeId());
+        TrackSegmentPlacer.place((ServerLevel) level, graph, edge);
         player.displayClientMessage(Component.literal(String.format("Connected -- edge length %.1f blocks.", edge.length())), true);
         return InteractionResult.CONSUME;
     }

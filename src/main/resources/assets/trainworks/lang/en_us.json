@@ -1,5 +1,6 @@
 {
   "itemGroup.trainworks": "Trainworks",
   "block.trainworks.track_anchor": "Track Anchor",
+  "block.trainworks.track_segment": "Track",
   "item.trainworks.track_hammer": "Track Linking Tool"
 }
