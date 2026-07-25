@@ -1,19 +1,25 @@
 package com.trainworks.train;
 
 import com.trainworks.ModEntities;
+import com.trainworks.track.BezierCurve;
+import com.trainworks.track.Edge;
 import com.trainworks.track.TrackAnchorBlock;
+import com.trainworks.track.TrackGraph;
+import com.trainworks.track.TrackGraphSavedData;
 import com.trainworks.track.TrackSegmentBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -43,6 +49,16 @@ public final class CarriageAssembler {
     }
 
     public static Result assemble(ServerLevel level, BlockPos bogiePos) {
+        // Read the bogie's track reference before anything is removed -- this is what lets the
+        // carriage spawn positioned/oriented on the curve itself (design/trains.md §3.3) rather
+        // than just at the bogie's raw block position with zero rotation.
+        long edgeId = -1L;
+        double distance = 0;
+        if (level.getBlockEntity(bogiePos) instanceof TrainBogieBlockEntity bogieEntity && bogieEntity.hasTrack()) {
+            edgeId = bogieEntity.edgeId();
+            distance = bogieEntity.distance();
+        }
+
         BlockPos seed = bogiePos.above();
         if (level.getBlockState(seed).isAir()) {
             return Result.fail("Nothing to assemble -- build something above the bogie first.");
@@ -93,9 +109,26 @@ public final class CarriageAssembler {
         }
         level.setBlock(bogiePos, Blocks.AIR.defaultBlockState(), 3);
 
+        Vec3 spawnPos = Vec3.atLowerCornerOf(bogiePos);
+        float spawnYaw = 0f;
+        if (edgeId != -1L) {
+            TrackGraph graph = TrackGraphSavedData.get(level).graph();
+            Optional<Edge> edge = graph.getEdge(edgeId);
+            if (edge.isPresent()) {
+                BezierCurve curve = graph.curveOf(edge.get());
+                Vec3 curvePos = curve.positionAt(distance);
+                // Curve positions are built from Vec3.atCenterOf (+0.5 in x, y, AND z --
+                // TrackGraph centers nodes vertically too, not just horizontally), but the
+                // captured blocks' relative offsets are corner-to-corner integer differences.
+                // Shift back by 0.5 on all three axes to keep both conventions consistent.
+                spawnPos = curvePos.subtract(0.5, 0.5, 0.5);
+                spawnYaw = curve.yawAt(distance);
+            }
+        }
+
         CarriageEntity carriage = new CarriageEntity(ModEntities.CARRIAGE.get(), level);
         carriage.setCapturedBlocks(captured);
-        carriage.moveTo(bogiePos.getX(), bogiePos.getY(), bogiePos.getZ(), 0f, 0f);
+        carriage.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, spawnYaw, 0f);
         level.addFreshEntity(carriage);
 
         return Result.ok(captured.size());

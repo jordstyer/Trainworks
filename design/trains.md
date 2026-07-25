@@ -208,15 +208,21 @@ own brake lever. Manual and automated trains use the exact same check.
       -- **no block-entity data yet** (a chest's contents are not preserved). Removes the captured
       blocks and the bogie from the world and spawns a `CarriageEntity`.
 - [x] Renderer (§6) for a single-bogie carriage, via `CarriageRenderer` (a `BlockRenderDispatcher
-      .renderSingleBlock` call per captured block, not full in-world tesselation/AO) -- **not yet**
-      the real bogie-pair transform math (§3.3): the carriage spawns at the bogie's exact position
-      with no rotation, exactly as built. Two-bogie orientation math is a follow-up once this is
-      confirmed rendering correctly. **Confirmed working in-game** after fixing two real bugs:
-      an undersized culling box (`getBoundingBoxForCulling` needs to reflect the actual captured
-      extent, not the tiny declared `EntityType` size) and a missing `getAddEntityPacket`
-      override (implementing `IEntityAdditionalSpawnData` alone does nothing -- the entity must
-      also opt into Forge's custom spawn packet, or the client never receives the captured blocks
-      at all).
+      .renderSingleBlock` call per captured block, not full in-world tesselation/AO) -- simple and
+      reliable for a first pass. **Confirmed working in-game** after fixing two real bugs: an
+      undersized culling box (`getBoundingBoxForCulling` needs to reflect the actual captured
+      extent, not the tiny declared `EntityType` size) and a missing `getAddEntityPacket` override
+      (implementing `IEntityAdditionalSpawnData` alone does nothing -- the entity must also opt
+      into Forge's custom spawn packet, or the client never receives the captured blocks at all).
+- [x] Single-bogie position/orientation from the track (§3.3, partial -- single point, not yet the
+      two-bogie pair math): `CarriageAssembler` reads the bogie's edge/distance *before* removing
+      it, computes `curve.positionAt`/`yawAt` at that distance, and spawns the carriage there with
+      that yaw instead of at the bogie's raw block position with zero rotation.
+      `CarriageRenderer` applies that yaw as a single whole-carriage rotation (via `Axis.YP
+      .rotationDegrees`, applied before any per-block translation, so each block's own facing
+      rotates too, not just its position) using the same sign convention already validated via the
+      anchor's facing indicator. No pitch/slope tilt yet -- deferred, noted as a known gap.
+      **Not yet manually tested in-game** -- next thing to verify.
 - [ ] Control stand: manual throttle/brake, drives a single carriage along straight + curved +
       sloped track built in Phase 1
 - [ ] Disassembly reverses assembly correctly, including a chest's contents
