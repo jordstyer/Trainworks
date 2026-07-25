@@ -5,6 +5,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
@@ -12,6 +14,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.entity.IEntityAdditionalSpawnData;
+import net.minecraftforge.network.NetworkHooks;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -76,6 +79,18 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
         }
         this.boundsMin = new BlockPos(minX, minY, minZ);
         this.boundsMax = new BlockPos(maxX, maxY, maxZ);
+    }
+
+    /**
+     * Implementing {@link IEntityAdditionalSpawnData} does nothing by itself --
+     * this override is what actually makes the server send Forge's custom spawn
+     * packet (carrying {@link #writeSpawnData}'s payload) instead of the plain
+     * vanilla one. Without it, {@link #readSpawnData} is never called on the
+     * client and {@code capturedBlocks} silently stays empty forever.
+     */
+    @Override
+    public Packet<ClientGamePacketListener> getAddEntityPacket() {
+        return NetworkHooks.getEntitySpawningPacket(this);
     }
 
     @Override
