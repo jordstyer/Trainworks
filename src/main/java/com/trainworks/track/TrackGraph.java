@@ -42,6 +42,19 @@ public class TrackGraph {
      * new edge. Tangents are derived from each node's facing, oriented toward
      * the other node, and locked into the edge permanently (design/track-graph.md §2.2).
      *
+     * <p>Both anchors' facing axes are resolved against the <em>same</em>
+     * A→B direction -- i.e. both tangents get chosen so they "point
+     * downstream," continuing the overall direction of travel, not each
+     * anchor's own perspective toward the other. This matters: resolving B's
+     * axis against the reverse (B→A) direction would pick whichever half of
+     * B's axis points <em>back</em> toward A, which fights the direction of
+     * travel instead of continuing it -- producing a curve that ignores B's
+     * actual facing and always bows toward whatever the fallback happens to
+     * be. It coincidentally still looks right when both anchors are aimed
+     * directly at each other (the two half-circle choices collapse to the
+     * same direction either way), which is why this stayed hidden until
+     * tested with genuinely different facings.</p>
+     *
      * <p>No validation (grade/radius/obstruction, design/track-graph.md §6) is
      * performed here -- that belongs to the linking tool, which should run
      * those checks before calling this.</p>
@@ -57,7 +70,7 @@ public class TrackGraph {
         Vec3 posB = Vec3.atCenterOf(nodeB.pos());
 
         float tangentAYaw = orientToward(nodeA.facingYaw(), posA, posB);
-        float tangentBYaw = orientToward(nodeB.facingYaw(), posB, posA);
+        float tangentBYaw = orientToward(nodeB.facingYaw(), posA, posB);
 
         BezierCurve curve = BezierCurve.create(posA, tangentAYaw, posB, tangentBYaw);
 
