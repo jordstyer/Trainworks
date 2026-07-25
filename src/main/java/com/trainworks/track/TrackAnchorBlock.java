@@ -13,6 +13,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.server.level.ServerLevel;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 
 /**
  * A single track anchor -- one "port" in the track graph. {@code FACING_INDEX}
@@ -74,7 +75,20 @@ public class TrackAnchorBlock extends Block implements EntityBlock {
     public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
         if (!state.is(newState.getBlock()) && !level.isClientSide()) {
             if (level.getBlockEntity(pos) instanceof TrackAnchorBlockEntity anchor && anchor.hasNode()) {
-                TrackGraphSavedData.get((ServerLevel) level).graph().removeNode(anchor.nodeId());
+                ServerLevel serverLevel = (ServerLevel) level;
+                TrackGraph graph = TrackGraphSavedData.get(serverLevel).graph();
+
+                // Capture each edge's curve (and id) before removeNode deletes the node data
+                // that curveOf() needs -- otherwise there's nothing left to walk to find the
+                // track segment blocks that need breaking too.
+                graph.getNode(anchor.nodeId()).ifPresent(node -> {
+                    for (long edgeId : new ArrayList<>(node.edgeIds())) {
+                        graph.getEdge(edgeId).ifPresent(edge ->
+                                TrackSegmentPlacer.remove(serverLevel, graph.curveOf(edge), edgeId));
+                    }
+                });
+
+                graph.removeNode(anchor.nodeId());
             }
         }
         super.onRemove(state, level, pos, newState, isMoving);
