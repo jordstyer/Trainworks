@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -11,9 +12,12 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
  * A single track-graph edge is rendered in-world as a run of these, placed
- * along its Bezier LUT (design/track-graph.md §4). Placeholder single-block-
- * wide shape for now -- the 3-wide gauge model (design/track-graph.md §2.4)
- * is a later rendering pass.
+ * along its Bezier LUT (design/track-graph.md §4). Collision is a thin slab
+ * (placeholder single-block-wide -- the 3-wide gauge, design/track-graph.md
+ * §2.4, is a later pass); the visual is entirely a dynamically-generated
+ * curved ribbon drawn by {@code TrackSegmentRenderer} (com.trainworks.client),
+ * not a baked block model, so this reports {@code INVISIBLE} to skip the
+ * normal static-model render path.
  */
 public class TrackSegmentBlock extends Block implements EntityBlock {
     // A thin slab roughly centered on the curve sample height, matching the
@@ -22,6 +26,11 @@ public class TrackSegmentBlock extends Block implements EntityBlock {
 
     public TrackSegmentBlock(Properties properties) {
         super(properties);
+    }
+
+    @Override
+    public RenderShape getRenderShape(BlockState state) {
+        return RenderShape.INVISIBLE;
     }
 
     @Override

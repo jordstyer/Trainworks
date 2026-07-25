@@ -180,12 +180,20 @@ a test track in-world and eyeballing/feeling it:
 - [x] Node/Edge data structures + `TrackGraphSavedData` (load/save round-trip test)
 - [x] Bézier construction + LUT generation from two nodes
 - [x] Anchor item + block (placement sets precise facing from look angle; model snaps to the
-      nearest 45° with a rotated indicator stripe, placeholder iron-block texture)
+      nearest 90° -- 45° isn't possible through vanilla blockstate rotation, see
+      `TrackAnchorBlock`'s class doc -- with a rotated indicator stripe and placeholder art)
 - [x] Linking tool: select → connect → generate edge (validation from §6 not yet implemented --
       only a duplicate-connection check exists so far); sneak-right-click an unconnected anchor
       to re-face it toward your current look direction
-- [x] Track segment block + block entity (`edgeId`, `distance`) placed along the LUT (placeholder
-      single-block-wide thin slab shape/texture, not the 3-wide gauge model yet)
+- [x] Track segment block + block entity (`edgeId`, `distance`, local polyline) placed along the
+      LUT, with orphaned-block cleanup when an anchor is broken (placeholder art; single-block-wide,
+      not the 3-wide gauge model yet)
+- [x] Continuous curved rendering: `TrackSegmentRenderer` (com.trainworks.client) draws each
+      segment's stored local polyline as a flat textured ribbon via a custom
+      `BlockEntityRenderer`, instead of a static per-block cube model -- this is what makes a whole
+      edge read as one smooth curve (Create-style) rather than a staircase of blocks. First-draft,
+      unverified in a running client -- see the risk note in that class's javadoc regarding quad
+      winding (geometry is deliberately double-emitted to guarantee visibility either way)
 - [ ] Chunk → edge-id index built at load, used for basic render culling
 - [ ] Validation rules (§6: grade, curve radius, obstruction) implemented and tuned against a
       test track
