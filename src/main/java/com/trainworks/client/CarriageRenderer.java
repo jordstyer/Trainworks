@@ -23,11 +23,16 @@ import net.minecraft.resources.ResourceLocation;
  * <p>The whole carriage is rotated once, by the entity's own yaw (set at
  * assembly time from the track's direction at the bogie -- design/
  * trains.md §3.3), before any per-block translation -- this rotates each
- * block's own facing along with its position, not just its position. The
- * rotation angle is applied directly as {@code entityYaw} with no sign
- * flip: this matches the same yaw convention already validated in-game via
- * the track anchor's facing indicator (blockstate "y" rotation), which
- * shares the same underlying rotation system as {@code Axis.YP}.</p>
+ * block's own facing along with its position, not just its position.
+ *
+ * <p>The angle is negated ({@code -entityYaw}). Verified against vanilla's
+ * own {@code Direction.fromYRot}: Minecraft's yaw increases <em>clockwise</em>
+ * viewed from above (0=south, 90=west, ...), matching the convention this
+ * mod already uses everywhere else, but {@code Axis.YP.rotationDegrees}
+ * applies a standard right-handed rotation, which is <em>counter-clockwise</em>
+ * for a positive angle viewed from above -- opposite handedness. Confirmed
+ * by an in-game test (structures built in line with the track rendered
+ * perpendicular before this negation) rather than assumed.</p>
  */
 public class CarriageRenderer extends EntityRenderer<CarriageEntity> {
     private final BlockRenderDispatcher blockRenderDispatcher;
@@ -41,7 +46,7 @@ public class CarriageRenderer extends EntityRenderer<CarriageEntity> {
     public void render(CarriageEntity entity, float entityYaw, float partialTick, PoseStack poseStack,
                         MultiBufferSource bufferSource, int packedLight) {
         poseStack.pushPose();
-        poseStack.mulPose(Axis.YP.rotationDegrees(entityYaw));
+        poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw));
 
         for (CarriageEntity.CapturedBlock block : entity.capturedBlocks()) {
             BlockPos relative = block.relativeOffset();
