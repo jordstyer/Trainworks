@@ -211,7 +211,12 @@ own brake lever. Manual and automated trains use the exact same check.
       .renderSingleBlock` call per captured block, not full in-world tesselation/AO) -- **not yet**
       the real bogie-pair transform math (§3.3): the carriage spawns at the bogie's exact position
       with no rotation, exactly as built. Two-bogie orientation math is a follow-up once this is
-      confirmed rendering correctly.
+      confirmed rendering correctly. **Confirmed working in-game** after fixing two real bugs:
+      an undersized culling box (`getBoundingBoxForCulling` needs to reflect the actual captured
+      extent, not the tiny declared `EntityType` size) and a missing `getAddEntityPacket`
+      override (implementing `IEntityAdditionalSpawnData` alone does nothing -- the entity must
+      also opt into Forge's custom spawn packet, or the client never receives the captured blocks
+      at all).
 - [ ] Control stand: manual throttle/brake, drives a single carriage along straight + curved +
       sloped track built in Phase 1
 - [ ] Disassembly reverses assembly correctly, including a chest's contents
