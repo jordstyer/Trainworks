@@ -11,6 +11,9 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -54,13 +57,25 @@ import java.util.Optional;
  * gets a position packet every few ticks, and was teleporting to each one
  * instead of easing toward it.</p>
  *
- * <p>The renderer applies {@code currentYaw - assemblyYaw} as its rotation,
- * not the raw current yaw -- seee {@code CarriageRenderer} for why the raw
+ * <p>The renderer applies {@code trackYaw() - assemblyYaw} as its rotation,
+ * not the raw current yaw -- see {@code CarriageRenderer} for why the raw
  * angle was wrong (it double-counts the alignment already baked into how
  * the structure was built). At the moment of assembly the two are equal,
  * so the delta is zero and nothing visually rotates; as the carriage moves
  * to track positions with a different heading than where it was built,
- * the delta grows and the render correctly follows the curve.</p>
+ * the delta grows and the render correctly follows the curve.
+ *
+ * <p>{@code trackYaw} is its own {@link SynchedEntityData} field, not
+ * {@code getYRot()}/the render-frame {@code entityYaw} parameter. Turned
+ * out to matter: vanilla's generic rotation network sync only sends an
+ * update once accumulated rotation change crosses roughly a 1.4° threshold
+ * (compared against the last value it actually sent), gated by its own
+ * periodic check -- fine for a mob that turns in noticeable increments,
+ * but for a carriage advancing very gradually every tick, that threshold
+ * could take a long time (or track sections with a gentle enough curve,
+ * effectively never) to trip, which looked exactly like "doesn't rotate at
+ * all" during testing. {@code SynchedEntityData} syncs on any actual value
+ * change with no angle-sized gate, so it doesn't have that failure mode.</p>
  *
  * <p>Block states are network-synced (via {@link IEntityAdditionalSpawnData})
  * and saved to disk as raw block-state registry ids rather than the fuller
@@ -72,6 +87,9 @@ import java.util.Optional;
 public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData {
     /** Test-only fixed speed for the unmanned movement proof -- ~1 block/second. */
     private static final double TEST_SPEED_BLOCKS_PER_TICK = 0.05;
+
+    private static final EntityDataAccessor<Float> DATA_TRACK_YAW =
+            SynchedEntityData.defineId(CarriageEntity.class, EntityDataSerializers.FLOAT);
 
     public record CapturedBlock(Vec3 relativeOffset, BlockState state) {
     }
@@ -109,10 +127,16 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
         this.edgeId = edgeId;
         this.distance = distance;
         this.assemblyYaw = assemblyYaw;
+        this.entityData.set(DATA_TRACK_YAW, assemblyYaw);
     }
 
     public float assemblyYaw() {
         return assemblyYaw;
+    }
+
+    /** Current track yaw, synced via {@link SynchedEntityData} -- see the class doc for why. */
+    public float trackYaw() {
+        return this.entityData.get(DATA_TRACK_YAW);
     }
 
     // Client-side interpolation target, per the standard pattern LivingEntity/vehicles use --
@@ -164,8 +188,10 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
         distance = Math.min(distance + TEST_SPEED_BLOCKS_PER_TICK, curve.length());
 
         Vec3 pos = curve.positionAt(distance).subtract(0.5, 0.5, 0.5);
+        float yaw = curve.yawAt(distance);
         setPos(pos.x, pos.y, pos.z);
-        setYRot(curve.yawAt(distance));
+        setYRot(yaw);
+        this.entityData.set(DATA_TRACK_YAW, yaw);
     }
 
     private void applyCapturedBlocks(List<CapturedBlock> blocks) {
@@ -206,8 +232,10 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
 
     @Override
     protected void defineSynchedData() {
-        // No SynchedEntityData fields -- the captured block list is variable-length and
-        // syncs via IEntityAdditionalSpawnData instead.
+        // The captured block list is variable-length and syncs via IEntityAdditionalSpawnData
+        // instead; trackYaw is the one small fixed-size value worth a real SynchedEntityData
+        // field, since it needs reliable per-tick sync (see the class doc).
+        this.entityData.define(DATA_TRACK_YAW, 0f);
     }
 
     @Override
