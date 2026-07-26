@@ -12,6 +12,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
@@ -43,11 +44,15 @@ import java.util.Optional;
  * {@code distance} along that edge by a fixed test speed every tick and
  * moves/rotates the entity accordingly -- no throttle/brake/player control
  * yet, just proving the core "follow the curve" mechanic in isolation
- * before wiring up driving on top of it. Position/rotation sync to
- * tracking clients uses the same standard entity-tracking mechanism every
- * vanilla entity relies on (periodic {@code ClientboundMoveEntityPacket}s
- * with client-side interpolation) -- no custom lerp code needed here,
- * just calling {@code setPos}/{@code setYRot} each server tick.</p>
+ * before wiring up driving on top of it.
+ *
+ * <p>The client interpolates toward each incoming position/rotation update
+ * over {@link #lerpTo}'s given step count, the same pattern {@code
+ * LivingEntity} and vehicle entities use. This turned out to matter: the
+ * base {@code Entity.lerpTo} does no interpolation at all (just snaps), so
+ * without overriding it here, movement looked jittery -- the client only
+ * gets a position packet every few ticks, and was teleporting to each one
+ * instead of easing toward it.</p>
  *
  * <p>The renderer applies {@code currentYaw - assemblyYaw} as its rotation,
  * not the raw current yaw -- seee {@code CarriageRenderer} for why the raw
@@ -110,10 +115,42 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
         return assemblyYaw;
     }
 
+    // Client-side interpolation target, per the standard pattern LivingEntity/vehicles use --
+    // see the class doc. The base Entity.lerpTo() has no interpolation at all (just snaps), which
+    // is exactly why movement looked jittery before this was added: the client only gets a
+    // position packet every few ticks, and without smoothing it teleports to each one instead of
+    // easing toward it.
+    private int lerpSteps;
+    private double lerpX, lerpY, lerpZ;
+    private float lerpYRot;
+
+    @Override
+    public void lerpTo(double x, double y, double z, float yRot, float xRot, int steps, boolean teleport) {
+        this.lerpX = x;
+        this.lerpY = y;
+        this.lerpZ = z;
+        this.lerpYRot = yRot;
+        this.lerpSteps = steps;
+    }
+
     @Override
     public void tick() {
         super.tick();
-        if (level().isClientSide() || edgeId == -1L) {
+
+        if (level().isClientSide()) {
+            if (lerpSteps > 0) {
+                double nx = getX() + (lerpX - getX()) / lerpSteps;
+                double ny = getY() + (lerpY - getY()) / lerpSteps;
+                double nz = getZ() + (lerpZ - getZ()) / lerpSteps;
+                float nyRot = getYRot() + (float) Mth.wrapDegrees(lerpYRot - getYRot()) / lerpSteps;
+                lerpSteps--;
+                setPos(nx, ny, nz);
+                setYRot(nyRot);
+            }
+            return;
+        }
+
+        if (edgeId == -1L) {
             return;
         }
 
