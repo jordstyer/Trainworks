@@ -13,6 +13,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.entity.IEntityAdditionalSpawnData;
 import net.minecraftforge.network.NetworkHooks;
 
@@ -20,16 +21,24 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A single assembled carriage: the blocks a player built above a bogie,
- * captured and moved out of the world into this entity. See
+ * A single assembled carriage: the blocks a player built around one or two
+ * bogies, captured and moved out of the world into this entity. See
  * design/trains.md §2.2/§3.
  *
- * <p>First-pass scope: renders exactly where it was assembled, with no
- * rotation applied (captured offsets render exactly as built) and no
- * movement yet -- see {@code CarriageAssembler} and
- * {@code com.trainworks.client.CarriageRenderer}. Bogie-derived position/
- * orientation math (design/trains.md §3.3) and actual movement are later
- * steps once this is confirmed rendering correctly.</p>
+ * <p>{@code CapturedBlock.relativeOffset} is a fractional {@link Vec3}, not
+ * an integer {@link BlockPos}: for a two-bogie carriage the entity's
+ * position is the midpoint between the two bogies' curve positions, which
+ * is generally not block-aligned, so offsets relative to it aren't either
+ * (design/trains.md §3.3). A single-bogie carriage is the degenerate case
+ * where that midpoint happens to sit at one specific point instead.</p>
+ *
+ * <p>No rotation is applied at render time (see {@code CarriageRenderer}) --
+ * captured offsets come straight from the world, where the player
+ * necessarily built already aligned with the physical track, so they're
+ * already correctly oriented. The entity's yaw is still computed and stored
+ * (from the bogie(s)' track position) for future use once movement exists
+ * and the carriage's heading can actually change from what it was
+ * assembled at.</p>
  *
  * <p>Block states are network-synced (via {@link IEntityAdditionalSpawnData})
  * and saved to disk as raw block-state registry ids rather than the fuller
@@ -40,7 +49,7 @@ import java.util.List;
  */
 public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData {
 
-    public record CapturedBlock(BlockPos relativeOffset, BlockState state) {
+    public record CapturedBlock(Vec3 relativeOffset, BlockState state) {
     }
 
     private List<CapturedBlock> capturedBlocks = List.of();
@@ -49,8 +58,8 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
     // The declared EntityType size (1x1x1) does not; leaving the default culling box would let
     // the renderer get skipped for any carriage taller/wider than that, with no error or crash,
     // just nothing drawn -- exactly what happened before this was added.
-    private BlockPos boundsMin = BlockPos.ZERO;
-    private BlockPos boundsMax = BlockPos.ZERO;
+    private Vec3 boundsMin = Vec3.ZERO;
+    private Vec3 boundsMax = Vec3.ZERO;
 
     public CarriageEntity(EntityType<?> type, Level level) {
         super(type, level);
@@ -67,18 +76,18 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
     private void applyCapturedBlocks(List<CapturedBlock> blocks) {
         this.capturedBlocks = List.copyOf(blocks);
 
-        int minX = 0, minY = 0, minZ = 0, maxX = 0, maxY = 0, maxZ = 0;
+        double minX = 0, minY = 0, minZ = 0, maxX = 0, maxY = 0, maxZ = 0;
         for (CapturedBlock block : this.capturedBlocks) {
-            BlockPos pos = block.relativeOffset();
-            minX = Math.min(minX, pos.getX());
-            minY = Math.min(minY, pos.getY());
-            minZ = Math.min(minZ, pos.getZ());
-            maxX = Math.max(maxX, pos.getX());
-            maxY = Math.max(maxY, pos.getY());
-            maxZ = Math.max(maxZ, pos.getZ());
+            Vec3 pos = block.relativeOffset();
+            minX = Math.min(minX, pos.x);
+            minY = Math.min(minY, pos.y);
+            minZ = Math.min(minZ, pos.z);
+            maxX = Math.max(maxX, pos.x);
+            maxY = Math.max(maxY, pos.y);
+            maxZ = Math.max(maxZ, pos.z);
         }
-        this.boundsMin = new BlockPos(minX, minY, minZ);
-        this.boundsMax = new BlockPos(maxX, maxY, maxZ);
+        this.boundsMin = new Vec3(minX, minY, minZ);
+        this.boundsMax = new Vec3(maxX, maxY, maxZ);
     }
 
     /**
@@ -96,8 +105,8 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
     @Override
     public AABB getBoundingBoxForCulling() {
         return new AABB(
-                getX() + boundsMin.getX(), getY() + boundsMin.getY(), getZ() + boundsMin.getZ(),
-                getX() + boundsMax.getX() + 1, getY() + boundsMax.getY() + 1, getZ() + boundsMax.getZ() + 1);
+                getX() + boundsMin.x, getY() + boundsMin.y, getZ() + boundsMin.z,
+                getX() + boundsMax.x + 1, getY() + boundsMax.y + 1, getZ() + boundsMax.z + 1);
     }
 
     @Override
@@ -112,7 +121,7 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
         List<CapturedBlock> blocks = new ArrayList<>(list.size());
         for (int i = 0; i < list.size(); i++) {
             CompoundTag entry = list.getCompound(i);
-            BlockPos relative = BlockPos.of(entry.getLong("Pos"));
+            Vec3 relative = new Vec3(entry.getDouble("X"), entry.getDouble("Y"), entry.getDouble("Z"));
             BlockState state = Block.BLOCK_STATE_REGISTRY.byId(entry.getInt("State"));
             blocks.add(new CapturedBlock(relative, state));
         }
@@ -124,7 +133,9 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
         ListTag list = new ListTag();
         for (CapturedBlock block : capturedBlocks) {
             CompoundTag entry = new CompoundTag();
-            entry.putLong("Pos", block.relativeOffset().asLong());
+            entry.putDouble("X", block.relativeOffset().x);
+            entry.putDouble("Y", block.relativeOffset().y);
+            entry.putDouble("Z", block.relativeOffset().z);
             entry.putInt("State", Block.BLOCK_STATE_REGISTRY.getId(block.state()));
             list.add(entry);
         }
@@ -135,7 +146,10 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
     public void writeSpawnData(FriendlyByteBuf buffer) {
         buffer.writeVarInt(capturedBlocks.size());
         for (CapturedBlock block : capturedBlocks) {
-            buffer.writeBlockPos(block.relativeOffset());
+            Vec3 relative = block.relativeOffset();
+            buffer.writeDouble(relative.x);
+            buffer.writeDouble(relative.y);
+            buffer.writeDouble(relative.z);
             buffer.writeVarInt(Block.BLOCK_STATE_REGISTRY.getId(block.state()));
         }
     }
@@ -145,7 +159,7 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
         int count = buffer.readVarInt();
         List<CapturedBlock> blocks = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            BlockPos relative = buffer.readBlockPos();
+            Vec3 relative = new Vec3(buffer.readDouble(), buffer.readDouble(), buffer.readDouble());
             BlockState state = Block.BLOCK_STATE_REGISTRY.byId(buffer.readVarInt());
             blocks.add(new CapturedBlock(relative, state));
         }

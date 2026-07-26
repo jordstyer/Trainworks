@@ -8,8 +8,8 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Draws a {@link CarriageEntity}'s captured blocks each at their stored
@@ -48,9 +48,9 @@ public class CarriageRenderer extends EntityRenderer<CarriageEntity> {
     public void render(CarriageEntity entity, float entityYaw, float partialTick, PoseStack poseStack,
                         MultiBufferSource bufferSource, int packedLight) {
         for (CarriageEntity.CapturedBlock block : entity.capturedBlocks()) {
-            BlockPos relative = block.relativeOffset();
+            Vec3 relative = block.relativeOffset();
             poseStack.pushPose();
-            poseStack.translate(relative.getX(), relative.getY(), relative.getZ());
+            poseStack.translate(relative.x, relative.y, relative.z);
             blockRenderDispatcher.renderSingleBlock(block.state(), poseStack, bufferSource, packedLight, OverlayTexture.NO_OVERLAY);
             poseStack.popPose();
         }

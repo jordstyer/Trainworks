@@ -23,14 +23,23 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Flood-fills whatever was built directly above a bogie, captures it into a
- * {@link CarriageEntity}, and clears the original blocks (including the
- * bogie itself) out of the world. See design/trains.md §5.1.
+ * Flood-fills whatever was built directly above/around a bogie, captures it
+ * into a {@link CarriageEntity}, and clears the original blocks (including
+ * any bogies involved) out of the world. See design/trains.md §5.1.
  *
- * <p>First-pass scope: single bogie, no mandatory-gap/multi-carriage logic
- * (design/trains.md §5.1 point 3) since there's only ever one carriage right
- * now. No block-entity data (chest contents etc.) is captured yet -- only
- * the block state.</p>
+ * <p>The fill also detects a <em>second</em> bogie if the built structure
+ * reaches one -- that's what makes the two-bogie transform (design/
+ * trains.md §3.3) possible: the carriage's position becomes the midpoint
+ * between both bogies' curve positions, and its yaw comes from the line
+ * between them, rather than a single point's tangent. Both bogies must
+ * reference the same track edge (a simple, deliberate constraint for now --
+ * spanning a junction is a later problem). A single connected bogie still
+ * works exactly as before (degenerates to the one-point case). More than
+ * two connected bogies is rejected outright.</p>
+ *
+ * <p>No mandatory-gap/multi-carriage logic (design/trains.md §5.1 point 3)
+ * since there's only ever one carriage right now. No block-entity data
+ * (chest contents etc.) is captured yet -- only the block state.</p>
  */
 public final class CarriageAssembler {
     private static final int MAX_BLOCKS = 256;
@@ -48,82 +57,108 @@ public final class CarriageAssembler {
         }
     }
 
-    public static Result assemble(ServerLevel level, BlockPos bogiePos) {
-        // Read the bogie's track reference before anything is removed -- this is what lets the
-        // carriage spawn positioned/oriented on the curve itself (design/trains.md §3.3) rather
-        // than just at the bogie's raw block position with zero rotation.
-        long edgeId = -1L;
-        double distance = 0;
-        if (level.getBlockEntity(bogiePos) instanceof TrainBogieBlockEntity bogieEntity && bogieEntity.hasTrack()) {
-            edgeId = bogieEntity.edgeId();
-            distance = bogieEntity.distance();
-        }
+    private record BogieRef(long edgeId, double distance) {
+    }
 
-        BlockPos seed = bogiePos.above();
+    public static Result assemble(ServerLevel level, BlockPos clickedBogiePos) {
+        BlockPos seed = clickedBogiePos.above();
         if (level.getBlockState(seed).isAir()) {
             return Result.fail("Nothing to assemble -- build something above the bogie first.");
         }
+
+        Set<BlockPos> foundBogies = new HashSet<>();
+        foundBogies.add(clickedBogiePos);
 
         Set<BlockPos> visited = new HashSet<>();
         Deque<BlockPos> queue = new ArrayDeque<>();
         queue.add(seed);
         visited.add(seed);
 
-        List<CarriageEntity.CapturedBlock> captured = new ArrayList<>();
+        List<BlockPos> capturedPositions = new ArrayList<>();
+        List<BlockState> capturedStates = new ArrayList<>();
 
         while (!queue.isEmpty()) {
-            if (captured.size() >= MAX_BLOCKS) {
+            if (capturedPositions.size() >= MAX_BLOCKS) {
                 return Result.fail("Too large to assemble (max " + MAX_BLOCKS + " blocks).");
             }
 
             BlockPos pos = queue.poll();
             BlockState state = level.getBlockState(pos);
-            if (state.isAir() || isTrackRelated(state)) {
+            if (state.isAir()) {
+                continue;
+            }
+            if (state.getBlock() instanceof TrainBogieBlock) {
+                // A second bogie ends the fill on that branch -- it's captured as a bogie
+                // reference, not as a normal block, and nothing beyond it is explored.
+                foundBogies.add(pos);
+                continue;
+            }
+            if (isTrackRelated(state)) {
                 continue;
             }
 
-            BlockPos relative = new BlockPos(
-                    pos.getX() - bogiePos.getX(),
-                    pos.getY() - bogiePos.getY(),
-                    pos.getZ() - bogiePos.getZ());
-            captured.add(new CarriageEntity.CapturedBlock(relative, state));
+            capturedPositions.add(pos);
+            capturedStates.add(state);
 
             for (Direction direction : Direction.values()) {
                 BlockPos next = pos.relative(direction);
-                if (visited.add(next)) {
-                    BlockState nextState = level.getBlockState(next);
-                    if (!nextState.isAir() && !isTrackRelated(nextState)) {
-                        queue.add(next);
-                    }
+                if (visited.add(next) && !level.getBlockState(next).isAir()) {
+                    queue.add(next);
                 }
             }
         }
 
-        if (captured.isEmpty()) {
+        if (capturedPositions.isEmpty()) {
             return Result.fail("Nothing to assemble.");
         }
-
-        for (CarriageEntity.CapturedBlock block : captured) {
-            BlockPos worldPos = bogiePos.offset(block.relativeOffset());
-            level.setBlock(worldPos, Blocks.AIR.defaultBlockState(), 3);
+        if (foundBogies.size() > 2) {
+            return Result.fail("Too many bogies connected -- carriages support at most 2 for now.");
         }
-        level.setBlock(bogiePos, Blocks.AIR.defaultBlockState(), 3);
 
-        Vec3 spawnPos = Vec3.atLowerCornerOf(bogiePos);
-        float spawnYaw = 0f;
-        if (edgeId != -1L) {
-            TrackGraph graph = TrackGraphSavedData.get(level).graph();
-            Optional<Edge> edge = graph.getEdge(edgeId);
-            if (edge.isPresent()) {
-                BezierCurve curve = graph.curveOf(edge.get());
-                Vec3 curvePos = curve.positionAt(distance);
-                // Curve positions are built from Vec3.atCenterOf (+0.5 in x, y, AND z --
-                // TrackGraph centers nodes vertically too, not just horizontally), but the
-                // captured blocks' relative offsets are corner-to-corner integer differences.
-                // Shift back by 0.5 on all three axes to keep both conventions consistent.
-                spawnPos = curvePos.subtract(0.5, 0.5, 0.5);
-                spawnYaw = curve.yawAt(distance);
+        List<BogieRef> bogieRefs = new ArrayList<>();
+        for (BlockPos bogiePos : foundBogies) {
+            if (level.getBlockEntity(bogiePos) instanceof TrainBogieBlockEntity entity && entity.hasTrack()) {
+                bogieRefs.add(new BogieRef(entity.edgeId(), entity.distance()));
             }
+        }
+
+        Vec3 spawnPos = Vec3.atLowerCornerOf(clickedBogiePos);
+        float spawnYaw = 0f;
+
+        if (bogieRefs.size() == 2) {
+            BogieRef a = bogieRefs.get(0);
+            BogieRef b = bogieRefs.get(1);
+            if (a.edgeId() != b.edgeId()) {
+                return Result.fail("Both bogies must be on the same track edge.");
+            }
+            Optional<BezierCurve> curve = curveFor(level, a.edgeId());
+            if (curve.isEmpty()) {
+                return Result.fail("Bogies reference a track edge that no longer exists.");
+            }
+            Vec3 posA = curve.get().positionAt(a.distance()).subtract(0.5, 0.5, 0.5);
+            Vec3 posB = curve.get().positionAt(b.distance()).subtract(0.5, 0.5, 0.5);
+            spawnPos = posA.add(posB).scale(0.5);
+            spawnYaw = yawBetween(posA, posB);
+        } else if (bogieRefs.size() == 1) {
+            BogieRef only = bogieRefs.get(0);
+            Optional<BezierCurve> curve = curveFor(level, only.edgeId());
+            if (curve.isPresent()) {
+                spawnPos = curve.get().positionAt(only.distance()).subtract(0.5, 0.5, 0.5);
+                spawnYaw = curve.get().yawAt(only.distance());
+            }
+        }
+
+        List<CarriageEntity.CapturedBlock> captured = new ArrayList<>(capturedPositions.size());
+        for (int i = 0; i < capturedPositions.size(); i++) {
+            Vec3 relative = Vec3.atLowerCornerOf(capturedPositions.get(i)).subtract(spawnPos);
+            captured.add(new CarriageEntity.CapturedBlock(relative, capturedStates.get(i)));
+        }
+
+        for (BlockPos pos : capturedPositions) {
+            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        }
+        for (BlockPos bogiePos : foundBogies) {
+            level.setBlock(bogiePos, Blocks.AIR.defaultBlockState(), 3);
         }
 
         CarriageEntity carriage = new CarriageEntity(ModEntities.CARRIAGE.get(), level);
@@ -134,9 +169,19 @@ public final class CarriageAssembler {
         return Result.ok(captured.size());
     }
 
+    private static Optional<BezierCurve> curveFor(ServerLevel level, long edgeId) {
+        TrackGraph graph = TrackGraphSavedData.get(level).graph();
+        return graph.getEdge(edgeId).map(graph::curveOf);
+    }
+
+    private static float yawBetween(Vec3 from, Vec3 to) {
+        double dx = to.x - from.x;
+        double dz = to.z - from.z;
+        return (float) Math.toDegrees(Math.atan2(-dx, dz));
+    }
+
     private static boolean isTrackRelated(BlockState state) {
         return state.getBlock() instanceof TrackAnchorBlock
-                || state.getBlock() instanceof TrackSegmentBlock
-                || state.getBlock() instanceof TrainBogieBlock;
+                || state.getBlock() instanceof TrackSegmentBlock;
     }
 }

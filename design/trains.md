@@ -214,20 +214,33 @@ own brake lever. Manual and automated trains use the exact same check.
       extent, not the tiny declared `EntityType` size) and a missing `getAddEntityPacket` override
       (implementing `IEntityAdditionalSpawnData` alone does nothing -- the entity must also opt
       into Forge's custom spawn packet, or the client never receives the captured blocks at all).
-- [x] Single-bogie position/orientation from the track (§3.3, partial -- single point, not yet the
-      two-bogie pair math): `CarriageAssembler` reads the bogie's edge/distance *before* removing
-      it, computes `curve.positionAt`/`yawAt` at that distance, and spawns the carriage there with
-      that yaw instead of at the bogie's raw block position. **Renderer applies no rotation** --
-      tried whole-carriage rotation via `Axis.YP.rotationDegrees` first, but in-game testing
-      showed it rotating structures *away* from correct alignment. Root realization: captured
-      offsets come straight from the world, where the player necessarily built already aligned
-      with the physical track ("coincident with the track") -- they're already correctly
-      oriented, so rotating by the track's absolute yaw double-counts that alignment. Rotation
-      only becomes meaningful once a carriage can move to a point with a *different* heading than
-      where it was assembled, and even then what's needed is the *delta* between assembly-time
-      and current yaw, not the raw angle. The entity still stores yaw (for that future use); the
-      renderer just doesn't consult it yet. No pitch/slope tilt either -- deferred, known gap.
-      **Not yet retested in-game** after this correction.
+- [x] Single-bogie position/orientation from the track (§3.3, one-point case): `CarriageAssembler`
+      reads the bogie's edge/distance *before* removing it, computes `curve.positionAt`/`yawAt` at
+      that distance, and spawns the carriage there with that yaw instead of at the bogie's raw
+      block position. **Renderer applies no rotation** -- tried whole-carriage rotation via
+      `Axis.YP.rotationDegrees` first, but in-game testing showed it rotating structures *away*
+      from correct alignment. Root realization: captured offsets come straight from the world,
+      where the player necessarily built already aligned with the physical track ("coincident
+      with the track") -- they're already correctly oriented, so rotating by the track's absolute
+      yaw double-counts that alignment. Rotation only becomes meaningful once a carriage can move
+      to a point with a *different* heading than where it was assembled, and even then what's
+      needed is the *delta* between assembly-time and current yaw, not the raw angle. The entity
+      still stores yaw (for that future use); the renderer just doesn't consult it yet. **Confirmed
+      correct in-game** for a straight track section; on a curve, a rigid single-bogie build can
+      only ever be as aligned as however precisely the player aimed while building relative to the
+      curve's local tangent (a rigid body can't perfectly trace a continuous curve) -- confirmed
+      as expected behavior, not a bug, and exactly the motivation for the two-bogie case below.
+- [x] Two-bogie position/orientation (§3.3, full case): the flood-fill in `CarriageAssembler` now
+      detects a *second* connected bogie (stopping the fill at it, same as it stops at track/
+      anchor blocks) instead of only ever working from one. With two bogies found (both must
+      reference the same track edge, or assembly is rejected), the carriage's position becomes the
+      midpoint between their two curve positions, and yaw comes from the line between them --
+      matching how a real railcar's orientation follows its two truck positions rather than a
+      single freehand build direction. `CarriageEntity.CapturedBlock.relativeOffset` changed from
+      integer `BlockPos` to fractional `Vec3` to support a midpoint that generally isn't
+      block-aligned (NBT/network sync updated to match). Single-bogie carriages still work
+      (degenerate one-point case). More than two connected bogies is rejected outright for now.
+      **Not yet tested in-game.**
 - [ ] Control stand: manual throttle/brake, drives a single carriage along straight + curved +
       sloped track built in Phase 1
 - [ ] Disassembly reverses assembly correctly, including a chest's contents
