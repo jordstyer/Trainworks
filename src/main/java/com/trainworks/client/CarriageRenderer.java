@@ -1,6 +1,7 @@
 package com.trainworks.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 import com.trainworks.train.CarriageEntity;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
@@ -19,22 +20,22 @@ import net.minecraft.world.phys.Vec3;
  * ambient occlusion/tesselation (design/trains.md §6), but simple and
  * reliable for a first pass.
  *
- * <p><strong>No rotation is applied here</strong> -- a conceptual correction
- * after testing showed structures rotating away from correct alignment, not
- * toward it. The captured relative offsets were extracted directly from the
- * world, where the player necessarily built <em>already aligned with the
- * physical track</em> (that's what "coincident with the track" means) --
- * so they're already in the correct final orientation. Rotating them again
- * by the track's absolute yaw double-counts that alignment. Rotation would
- * only become meaningful once a carriage can move to a point on the curve
- * with a different heading than where it was assembled -- and even then,
- * what's needed is the *delta* between assembly-time yaw and current yaw,
- * not the raw absolute angle applied here before. No movement exists yet,
- * so for this static-only phase the correct answer is no rotation at all.
+ * <p>Rotation is the <em>delta</em> between the entity's current yaw and
+ * its assembly-time yaw ({@code entityYaw - entity.assemblyYaw()}), not the
+ * raw current angle. Captured offsets come straight from the world, where
+ * the player necessarily built already aligned with the physical track --
+ * so at the exact moment of assembly (current yaw == assembly yaw) the
+ * delta is zero and nothing rotates, matching how it must render when
+ * stationary. Applying the raw current yaw instead double-counts that
+ * alignment (confirmed by an earlier in-game test: it rotated a structure
+ * built in line with straight track to perpendicular). As the carriage
+ * moves to points on the curve with a different heading than where it was
+ * built, the delta grows and the render correctly follows along.</p>
  *
- * <p>The entity's own yaw (set at assembly time from the track's direction
- * at the bogie -- design/trains.md §3.3) is still stored on the entity for
- * that future delta-based use; it's just not consulted for rendering yet.</p>
+ * <p>The angle is still negated ({@code -delta}), same handedness reasoning
+ * as before: Minecraft yaw increases clockwise viewed from above (matches
+ * {@code Direction.fromYRot}), but {@code Axis.YP.rotationDegrees} is a
+ * standard right-handed (counter-clockwise) rotation -- opposite senses.</p>
  */
 public class CarriageRenderer extends EntityRenderer<CarriageEntity> {
     private final BlockRenderDispatcher blockRenderDispatcher;
@@ -47,6 +48,11 @@ public class CarriageRenderer extends EntityRenderer<CarriageEntity> {
     @Override
     public void render(CarriageEntity entity, float entityYaw, float partialTick, PoseStack poseStack,
                         MultiBufferSource bufferSource, int packedLight) {
+        float deltaYaw = entityYaw - entity.assemblyYaw();
+
+        poseStack.pushPose();
+        poseStack.mulPose(Axis.YP.rotationDegrees(-deltaYaw));
+
         for (CarriageEntity.CapturedBlock block : entity.capturedBlocks()) {
             Vec3 relative = block.relativeOffset();
             poseStack.pushPose();
@@ -54,6 +60,8 @@ public class CarriageRenderer extends EntityRenderer<CarriageEntity> {
             blockRenderDispatcher.renderSingleBlock(block.state(), poseStack, bufferSource, packedLight, OverlayTexture.NO_OVERLAY);
             poseStack.popPose();
         }
+
+        poseStack.popPose();
         super.render(entity, entityYaw, partialTick, poseStack, bufferSource, packedLight);
     }
 

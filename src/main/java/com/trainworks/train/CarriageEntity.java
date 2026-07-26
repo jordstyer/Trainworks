@@ -1,5 +1,9 @@
 package com.trainworks.train;
 
+import com.trainworks.track.BezierCurve;
+import com.trainworks.track.Edge;
+import com.trainworks.track.TrackGraph;
+import com.trainworks.track.TrackGraphSavedData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -7,6 +11,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
@@ -19,6 +24,7 @@ import net.minecraftforge.network.NetworkHooks;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * A single assembled carriage: the blocks a player built around one or two
@@ -32,13 +38,24 @@ import java.util.List;
  * (design/trains.md §3.3). A single-bogie carriage is the degenerate case
  * where that midpoint happens to sit at one specific point instead.</p>
  *
- * <p>No rotation is applied at render time (see {@code CarriageRenderer}) --
- * captured offsets come straight from the world, where the player
- * necessarily built already aligned with the physical track, so they're
- * already correctly oriented. The entity's yaw is still computed and stored
- * (from the bogie(s)' track position) for future use once movement exists
- * and the carriage's heading can actually change from what it was
- * assembled at.</p>
+ * <p><strong>Movement (first-pass, unmanned test):</strong> if a track
+ * reference was set ({@link #setTrackReference}), the server advances
+ * {@code distance} along that edge by a fixed test speed every tick and
+ * moves/rotates the entity accordingly -- no throttle/brake/player control
+ * yet, just proving the core "follow the curve" mechanic in isolation
+ * before wiring up driving on top of it. Position/rotation sync to
+ * tracking clients uses the same standard entity-tracking mechanism every
+ * vanilla entity relies on (periodic {@code ClientboundMoveEntityPacket}s
+ * with client-side interpolation) -- no custom lerp code needed here,
+ * just calling {@code setPos}/{@code setYRot} each server tick.</p>
+ *
+ * <p>The renderer applies {@code currentYaw - assemblyYaw} as its rotation,
+ * not the raw current yaw -- seee {@code CarriageRenderer} for why the raw
+ * angle was wrong (it double-counts the alignment already baked into how
+ * the structure was built). At the moment of assembly the two are equal,
+ * so the delta is zero and nothing visually rotates; as the carriage moves
+ * to track positions with a different heading than where it was built,
+ * the delta grows and the render correctly follows the curve.</p>
  *
  * <p>Block states are network-synced (via {@link IEntityAdditionalSpawnData})
  * and saved to disk as raw block-state registry ids rather than the fuller
@@ -48,6 +65,8 @@ import java.util.List;
  * revisiting before this is depended on for real saves.</p>
  */
 public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData {
+    /** Test-only fixed speed for the unmanned movement proof -- ~1 block/second. */
+    private static final double TEST_SPEED_BLOCKS_PER_TICK = 0.05;
 
     public record CapturedBlock(Vec3 relativeOffset, BlockState state) {
     }
@@ -61,6 +80,14 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
     private Vec3 boundsMin = Vec3.ZERO;
     private Vec3 boundsMax = Vec3.ZERO;
 
+    // Track reference for movement -- server-side authority only, not synced to clients (they
+    // only need the interpolated position/yaw from the standard entity-tracking sync).
+    private long edgeId = -1L;
+    private double distance;
+    // Fixed at assembly time; see the class doc for why the renderer needs this alongside the
+    // ever-changing current yaw rather than using either value alone.
+    private float assemblyYaw;
+
     public CarriageEntity(EntityType<?> type, Level level) {
         super(type, level);
     }
@@ -71,6 +98,37 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
 
     public List<CapturedBlock> capturedBlocks() {
         return capturedBlocks;
+    }
+
+    public void setTrackReference(long edgeId, double distance, float assemblyYaw) {
+        this.edgeId = edgeId;
+        this.distance = distance;
+        this.assemblyYaw = assemblyYaw;
+    }
+
+    public float assemblyYaw() {
+        return assemblyYaw;
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        if (level().isClientSide() || edgeId == -1L) {
+            return;
+        }
+
+        TrackGraph graph = TrackGraphSavedData.get((ServerLevel) level()).graph();
+        Optional<Edge> edge = graph.getEdge(edgeId);
+        if (edge.isEmpty()) {
+            return;
+        }
+
+        BezierCurve curve = graph.curveOf(edge.get());
+        distance = Math.min(distance + TEST_SPEED_BLOCKS_PER_TICK, curve.length());
+
+        Vec3 pos = curve.positionAt(distance).subtract(0.5, 0.5, 0.5);
+        setPos(pos.x, pos.y, pos.z);
+        setYRot(curve.yawAt(distance));
     }
 
     private void applyCapturedBlocks(List<CapturedBlock> blocks) {
@@ -126,6 +184,10 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
             blocks.add(new CapturedBlock(relative, state));
         }
         applyCapturedBlocks(blocks);
+
+        edgeId = tag.getLong("EdgeId");
+        distance = tag.getDouble("Distance");
+        assemblyYaw = tag.getFloat("AssemblyYaw");
     }
 
     @Override
@@ -140,10 +202,15 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
             list.add(entry);
         }
         tag.put("Blocks", list);
+
+        tag.putLong("EdgeId", edgeId);
+        tag.putDouble("Distance", distance);
+        tag.putFloat("AssemblyYaw", assemblyYaw);
     }
 
     @Override
     public void writeSpawnData(FriendlyByteBuf buffer) {
+        buffer.writeFloat(assemblyYaw);
         buffer.writeVarInt(capturedBlocks.size());
         for (CapturedBlock block : capturedBlocks) {
             Vec3 relative = block.relativeOffset();
@@ -156,6 +223,7 @@ public class CarriageEntity extends Entity implements IEntityAdditionalSpawnData
 
     @Override
     public void readSpawnData(FriendlyByteBuf buffer) {
+        assemblyYaw = buffer.readFloat();
         int count = buffer.readVarInt();
         List<CapturedBlock> blocks = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {

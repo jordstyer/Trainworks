@@ -124,6 +124,8 @@ public final class CarriageAssembler {
 
         Vec3 spawnPos = Vec3.atLowerCornerOf(clickedBogiePos);
         float spawnYaw = 0f;
+        long refEdgeId = -1L;
+        double refDistance = 0;
 
         if (bogieRefs.size() == 2) {
             BogieRef a = bogieRefs.get(0);
@@ -139,12 +141,16 @@ public final class CarriageAssembler {
             Vec3 posB = curve.get().positionAt(b.distance()).subtract(0.5, 0.5, 0.5);
             spawnPos = posA.add(posB).scale(0.5);
             spawnYaw = yawBetween(posA, posB);
+            refEdgeId = a.edgeId();
+            refDistance = (a.distance() + b.distance()) / 2.0;
         } else if (bogieRefs.size() == 1) {
             BogieRef only = bogieRefs.get(0);
             Optional<BezierCurve> curve = curveFor(level, only.edgeId());
             if (curve.isPresent()) {
                 spawnPos = curve.get().positionAt(only.distance()).subtract(0.5, 0.5, 0.5);
                 spawnYaw = curve.get().yawAt(only.distance());
+                refEdgeId = only.edgeId();
+                refDistance = only.distance();
             }
         }
 
@@ -164,6 +170,7 @@ public final class CarriageAssembler {
         CarriageEntity carriage = new CarriageEntity(ModEntities.CARRIAGE.get(), level);
         carriage.setCapturedBlocks(captured);
         carriage.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, spawnYaw, 0f);
+        carriage.setTrackReference(refEdgeId, refDistance, spawnYaw);
         level.addFreshEntity(carriage);
 
         return Result.ok(captured.size());

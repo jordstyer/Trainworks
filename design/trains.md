@@ -241,6 +241,17 @@ own brake lever. Manual and automated trains use the exact same check.
       block-aligned (NBT/network sync updated to match). Single-bogie carriages still work
       (degenerate one-point case). More than two connected bogies is rejected outright for now.
       **Confirmed working in-game.**
+- [x] Unmanned movement proof (no player control yet -- deliberate sub-step before driving):
+      `CarriageEntity.tick()` advances a stored `(edgeId, distance)` by a fixed test speed
+      (~1 block/sec) every server tick and calls `setPos`/`setYRot` from `curve.positionAt`/
+      `yawAt` at the new distance. No custom client interpolation needed -- the standard
+      entity-tracking sync every vanilla entity uses (periodic position packets, client-side
+      lerp) handles it automatically once the server updates position authoritatively.
+      `CarriageRenderer` now applies rotation as `currentYaw - assemblyYaw` (a delta, not the raw
+      angle) -- zero at the moment of assembly, matching the already-correct static case, growing
+      only as the carriage actually moves somewhere with a different heading. Stops at the end of
+      its edge (no junction-crossing logic yet, out of scope for this proof). **Not yet tested
+      in-game.**
 - [ ] Control stand: manual throttle/brake, drives a single carriage along straight + curved +
       sloped track built in Phase 1
 - [ ] Disassembly reverses assembly correctly, including a chest's contents
