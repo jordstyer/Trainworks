@@ -244,14 +244,23 @@ own brake lever. Manual and automated trains use the exact same check.
 - [x] Unmanned movement proof (no player control yet -- deliberate sub-step before driving):
       `CarriageEntity.tick()` advances a stored `(edgeId, distance)` by a fixed test speed
       (~1 block/sec) every server tick and calls `setPos`/`setYRot` from `curve.positionAt`/
-      `yawAt` at the new distance. No custom client interpolation needed -- the standard
-      entity-tracking sync every vanilla entity uses (periodic position packets, client-side
-      lerp) handles it automatically once the server updates position authoritatively.
-      `CarriageRenderer` now applies rotation as `currentYaw - assemblyYaw` (a delta, not the raw
-      angle) -- zero at the moment of assembly, matching the already-correct static case, growing
-      only as the carriage actually moves somewhere with a different heading. Stops at the end of
-      its edge (no junction-crossing logic yet, out of scope for this proof). **Not yet tested
-      in-game.**
+      `yawAt` at the new distance. Stops at the end of its edge (no junction-crossing logic yet,
+      out of scope for this proof). **Confirmed working in-game**, including after fixing two
+      real bugs:
+      - Jittery motion: the base `Entity.lerpTo()` has no interpolation at all (just snaps) --
+        only specific vanilla subclasses (`LivingEntity`, vehicles) override it to ease over
+        several ticks. `CarriageEntity` now does too.
+      - Rotation-while-moving was attempted (a delta between a `SynchedEntityData`-synced
+        "current track yaw" and assembly-time yaw, since vanilla's generic rotation sync has its
+        own ~1.4° change threshold that a slow, continuously-turning carriage might never trip)
+        but produced a *worse* bug: confirmed via the entity's debug hitbox that position was
+        correct while the rendered blocks were displaced far away, almost certainly a
+        synchronization-timing mismatch between the two separately-synced yaw values.
+        **Deliberately reverted** -- `CarriageRenderer` renders with no rotation at all for now
+        (matching the already-confirmed-correct static case), and a moving carriage keeps its
+        assembly-time visual orientation rather than turning to match the curve. Rotation-while-
+        moving is deferred to when the real driving feature is built, where it can be designed
+        more carefully instead of bolted onto this proof-of-concept.
 - [ ] Control stand: manual throttle/brake, drives a single carriage along straight + curved +
       sloped track built in Phase 1
 - [ ] Disassembly reverses assembly correctly, including a chest's contents
