@@ -240,7 +240,7 @@ own brake lever. Manual and automated trains use the exact same check.
       integer `BlockPos` to fractional `Vec3` to support a midpoint that generally isn't
       block-aligned (NBT/network sync updated to match). Single-bogie carriages still work
       (degenerate one-point case). More than two connected bogies is rejected outright for now.
-      **Not yet tested in-game.**
+      **Confirmed working in-game.**
 - [ ] Control stand: manual throttle/brake, drives a single carriage along straight + curved +
       sloped track built in Phase 1
 - [ ] Disassembly reverses assembly correctly, including a chest's contents
